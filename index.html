@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GGUF Model Finder — find llama.cpp models that fit your machine</title>
+<meta name="description" content="Search Hugging Face for llama.cpp-compatible GGUF models, see which quants fit your GPU, and copy the command to run them.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='13' font-size='14'>&#129302;</text></svg>">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="masthead">
+  <h1>GGUF Model Finder</h1>
+  <p>Search Hugging Face for llama.cpp models, see which quants fit your machine, and copy the command to run them.</p>
+</header>
+
+<form class="hardware" id="hardware" autocomplete="off">
+  <div class="fields">
+    <label class="field">
+      <span>GPU VRAM</span>
+      <input id="vram" type="number" min="0" max="1024" step="0.5" list="vram-presets"><em>GB</em>
+    </label>
+    <label class="field">
+      <span>System RAM</span>
+      <input id="ram" type="number" min="1" max="4096" step="1" list="ram-presets"><em>GB</em>
+    </label>
+    <label class="field">
+      <span>Context</span>
+      <input id="ctx" type="number" min="256" max="1048576" step="256" list="ctx-presets"><em>tok</em>
+    </label>
+    <label class="field">
+      <span>KV cache</span>
+      <select id="cache">
+        <option value="f16">f16</option>
+        <option value="q8_0">q8_0</option>
+        <option value="q4_0">q4_0</option>
+      </select>
+    </label>
+    <label class="field">
+      <span>OS reserve</span>
+      <input id="reserved" type="number" min="0" max="16" step="0.1"><em>GB</em>
+    </label>
+  </div>
+  <p class="caveat" id="fa-caveat" hidden>
+    Quantised KV cache needs <code>--flash-attn on</code>, which is appended to every command below.
+    A prebuilt binary without flash-attention kernels will fall back to CPU attention silently — and run 25–45× slower.
+  </p>
+</form>
+
+<datalist id="vram-presets"><option>0</option><option>8</option><option>12</option><option>16</option><option>24</option><option>32</option><option>48</option></datalist>
+<datalist id="ram-presets"><option>8</option><option>16</option><option>32</option><option>64</option><option>128</option></datalist>
+<datalist id="ctx-presets"><option>2048</option><option>4096</option><option>8192</option><option>16384</option><option>32768</option><option>65536</option><option>131072</option></datalist>
+
+<main>
+  <div class="controls">
+    <input id="q" type="search" placeholder="Search models — try “qwen3”, “gemma”, “coder”" aria-label="Search models">
+    <select id="sort" aria-label="Sort results">
+      <optgroup label="From Hugging Face">
+        <option value="trendingScore">Trending</option>
+        <option value="downloads">Most downloaded</option>
+        <option value="lastModified">Recently updated</option>
+        <option value="likes">Most liked</option>
+      </optgroup>
+      <optgroup label="By fit on your machine">
+        <option value="~fit">Best fit for your GPU</option>
+        <option value="~size">Smallest files first</option>
+        <option value="~creator">Creator A–Z</option>
+      </optgroup>
+    </select>
+    <label class="toggle"><input id="fits-only" type="checkbox"> Only what fits on GPU</label>
+  </div>
+
+  <div id="results" aria-live="polite"></div>
+  <button id="more" class="more" hidden>Load more</button>
+</main>
+
+<footer>
+  <details>
+    <summary>How these estimates work</summary>
+    <p>
+      Each quant’s architecture is read straight from the GGUF file header over a ranged
+      request — a few kilobytes, not the whole model. Weights are assumed to spread evenly
+      across layers (<code>file size ÷ layer count</code>), and the KV cache is
+      <code>2 × layers × KV heads × head dim × context</code> at the selected precision.
+      A 12% allowance is added on top for compute buffers and allocator slack.
+    </p>
+    <p>
+      These are ballpark numbers, not llama.cpp’s own sizing. Treat a result near the edge
+      of your VRAM as “probably”, not “definitely” — real runs often need a little more than
+      the arithmetic suggests. Mixture-of-experts and MLA architectures are the least accurate,
+      since their cache does not follow the formula above.
+    </p>
+  </details>
+  <p>Nothing is sent anywhere but Hugging Face. Your hardware settings stay in this browser.</p>
+</footer>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

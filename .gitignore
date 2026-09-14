@@ -1,0 +1,11 @@
+# OS and editor cruft
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+
+# Local scratch — the project itself has no build step and no dependencies
+node_modules/
+_*.html
+*.local
