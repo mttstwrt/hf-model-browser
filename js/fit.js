@@ -15,7 +15,7 @@ const HEADROOM = 1.12;
 /**
  * @param size  quant file size in bytes
  * @param shape architecture numbers from the GGUF header
- * @param hw    { vram, ram, reserved } in bytes, { ctx, cacheType }
+ * @param hw    { vram, ram, reserved } in bytes, { ctx, cacheType, unified }
  */
 export function estimate(size, shape, hw) {
   const { nLayer, nHeadKv, headDim } = shape;
@@ -23,15 +23,22 @@ export function estimate(size, shape, hw) {
   const weightPerLayer = size / nLayer;              // embeddings smeared across layers
   const perLayer = (weightPerLayer + kvPerLayer) * HEADROOM;
 
-  const vram = Math.max(0, hw.vram - hw.reserved);
+  // On a unified-memory machine there is one pool, not two: an offloaded layer
+  // lands in the very same DRAM the GPU is reading from, so RAM and VRAM cannot
+  // be spent twice. `vram` there is a ceiling on how much of the pool the GPU is
+  // allowed to wire down, not a separate budget, and the OS reserve comes off
+  // the pool once rather than off each side.
+  const pool = Math.max(0, hw.ram - hw.reserved);
+  const vram = hw.unified ? Math.min(hw.vram, pool) : Math.max(0, hw.vram - hw.reserved);
   const ngl = Math.max(0, Math.min(nLayer, Math.floor(vram / perLayer)));
 
   const onGpu = ngl * perLayer;
   const onCpu = (nLayer - ngl) * perLayer;
-  const ramOk = onCpu <= hw.ram;
+  const ramOk = hw.unified ? onGpu + onCpu <= pool : onCpu <= hw.ram;
 
   return {
-    ngl, nLayer, onGpu, onCpu, vram, ramOk,
+    ngl, nLayer, onGpu, onCpu, vram, ramOk, pool,
+    unified: !!hw.unified,
     weights: size,
     kv: kvPerLayer * nLayer,
     gpuFraction: ngl / nLayer,
@@ -94,7 +101,8 @@ export function iniSection(repo, q, f, hw, fmt) {
     f.ngl === f.nLayer
       ? `; all ${f.nLayer} layers on GPU — n-gpu-layers 99 puts the output layer there too`
       : `; ${f.ngl} of ${f.nLayer} layers on GPU, ${f.nLayer - f.ngl} offloaded to system RAM`,
-    `; computed for ${hw.vram ? `${fmt(hw.vram)} VRAM (${fmt(hw.reserved)} reserved for the OS)` : 'no GPU'},`
+    `; computed for ${hw.unified ? `${fmt(hw.ram)} unified memory, GPU capped at ${fmt(hw.vram)} (${fmt(hw.reserved)} reserved for the OS)`
+      : hw.vram ? `${fmt(hw.vram)} VRAM (${fmt(hw.reserved)} reserved for the OS)` : 'no GPU'},`
       + ` ${hw.ctx} context, ${hw.cacheType} KV cache`,
     hw.vram
       ? `; estimated ${fmt(f.onGpu)} VRAM in use` + (f.onCpu > 0 ? `, plus ${fmt(f.onCpu)} of system RAM` : '')

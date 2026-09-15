@@ -4,7 +4,13 @@
 import { parseHeader, shape, Truncated } from './gguf.js';
 
 const API = 'https://huggingface.co/api';
-const EXPAND = ['lastModified', 'downloads', 'likes', 'pipeline_tag'];
+// `tags` carries the base_model lineage; `gguf` carries the trained context
+// length. Both let the list be filtered the moment it arrives, rather than
+// waiting on a header read per repo. `gguf` also drags in each repo's chat
+// template, which is most of the response weight — about 2 KB gzipped per
+// model — so the caller keeps the page size in hand instead of always asking
+// for the maximum.
+const EXPAND = ['lastModified', 'downloads', 'likes', 'pipeline_tag', 'tags', 'gguf'];
 
 async function json(url) {
   const r = await fetch(url);
@@ -13,8 +19,9 @@ async function json(url) {
   return r.json();
 }
 
-export function search({ q, sort, limit = 20 }) {
+export function search({ q, sort, limit = 20, skip = 0 }) {
   const p = new URLSearchParams({ filter: 'gguf', sort, direction: '-1', limit });
+  if (skip) p.set('skip', skip);
   if (q) p.set('search', q);
   for (const f of EXPAND) p.append('expand[]', f);
   return json(`${API}/models?${p}`);

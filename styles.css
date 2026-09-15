@@ -53,6 +53,7 @@ a { color: var(--accent); }
 .field select { font-family: ui-monospace, monospace; font-size: 15px; margin-left: -2px; }
 .field input:focus, .field select:focus { outline: none; }
 
+.caveats:has(> .caveat:not([hidden])) { padding-top: 10px; }
 .caveat {
   max-width: 940px; margin: 10px auto 0; padding: 8px 12px;
   font-size: 13px; color: var(--warn); line-height: 1.45;
@@ -72,6 +73,27 @@ main { max-width: 940px; margin: 0 auto; }
 #q:focus, #sort:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent); }
 .toggle { display: flex; align-items: center; gap: 6px; font-size: 14px; color: var(--muted); white-space: nowrap; }
 .toggle input { accent-color: var(--accent); }
+.toggle b { font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; }
+
+.fields-foot { max-width: 940px; margin: 8px auto 0; }
+
+/* ---- filter row ------------------------------------------------------ */
+.filters {
+  display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center;
+  margin: -6px 0 16px; padding: 10px 12px;
+  background: var(--sunken); border-radius: var(--radius);
+}
+.filter { display: flex; align-items: center; gap: 7px; font-size: 14px; color: var(--muted); }
+.filter select, .filter input {
+  padding: 5px 8px; font: inherit; font-size: 14px; color: var(--text);
+  background: var(--surface); border: 1px solid var(--line); border-radius: 7px;
+}
+.filter input { width: 9ch; font-variant-numeric: tabular-nums; }
+.filter select:focus, .filter input:focus {
+  outline: none; border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+.filter-count { margin: 0 0 0 auto; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
 
 /* ---- result cards ---------------------------------------------------- */
 .card {
@@ -86,6 +108,16 @@ main { max-width: 940px; margin: 0 auto; }
 .stats { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .arch { margin-top: 3px; font-size: 13px; color: var(--muted); }
 .arch .tag { color: var(--text); font-weight: 500; }
+.arch .short { color: var(--warn); }
+.arch .unknown-ctx { font-style: italic; opacity: .75; }
+
+.badge {
+  margin-left: 7px; padding: 1px 6px; border-radius: 5px; vertical-align: 1px;
+  font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em;
+  color: var(--muted); background: var(--sunken); border: 1px solid var(--line);
+}
+.badge.ok { color: var(--ok); background: color-mix(in srgb, var(--ok) 12%, transparent); border-color: transparent; }
+.badge.alt { color: var(--warn); background: color-mix(in srgb, var(--warn) 12%, transparent); border-color: transparent; }
 
 .quants { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 11px; }
 .chip {
@@ -151,5 +183,8 @@ footer p { max-width: 72ch; }
 @media (max-width: 620px) {
   .masthead { padding-top: 28px; }
   .field { flex-basis: calc(50% - 5px); }
-  .toggle { flex-basis: 100%; }
+  .toggle { flex-basis: 100%; white-space: normal; }
+  .filters { gap: 10px; }
+  .filter { flex-basis: 100%; justify-content: space-between; }
+  .filter-count { margin: 0; flex-basis: 100%; }
 }

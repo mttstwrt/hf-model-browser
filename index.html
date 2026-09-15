@@ -18,11 +18,11 @@
 <form class="hardware" id="hardware" autocomplete="off">
   <div class="fields">
     <label class="field">
-      <span>GPU VRAM</span>
+      <span id="vram-label">GPU VRAM</span>
       <input id="vram" type="number" min="0" max="1024" step="0.5" list="vram-presets"><em>GB</em>
     </label>
     <label class="field">
-      <span>System RAM</span>
+      <span id="ram-label">System RAM</span>
       <input id="ram" type="number" min="1" max="4096" step="1" list="ram-presets"><em>GB</em>
     </label>
     <label class="field">
@@ -42,15 +42,29 @@
       <input id="reserved" type="number" min="0" max="16" step="0.1"><em>GB</em>
     </label>
   </div>
+  <div class="fields-foot">
+    <label class="toggle"><input id="unified" type="checkbox"> Unified memory (Apple Silicon, Ryzen AI Max, Jetson)</label>
+  </div>
+</form>
+
+<!-- Outside the sticky bar: these explain a setting once, and do not earn a
+     permanent strip of the viewport the way the fields themselves do. -->
+<div class="caveats">
+  <p class="caveat" id="unified-note" hidden>
+    One pool, not two. <b>Total memory</b> is everything the machine has; <b>GPU limit</b> is how much of it the
+    GPU may wire down — macOS allows roughly 75% by default (<code>sudo sysctl iogpu.wired_limit_mb=…</code>).
+    Layers left on the CPU come out of that same pool, so they are counted once rather than against a second budget.
+  </p>
   <p class="caveat" id="fa-caveat" hidden>
     Quantised KV cache needs <code>--flash-attn on</code>, which is appended to every command below.
     A prebuilt binary without flash-attention kernels will fall back to CPU attention silently — and run 25–45× slower.
   </p>
-</form>
+</div>
 
 <datalist id="vram-presets"><option>0</option><option>8</option><option>12</option><option>16</option><option>24</option><option>32</option><option>48</option></datalist>
 <datalist id="ram-presets"><option>8</option><option>16</option><option>32</option><option>64</option><option>128</option></datalist>
-<datalist id="ctx-presets"><option>2048</option><option>4096</option><option>8192</option><option>16384</option><option>32768</option><option>65536</option><option>131072</option></datalist>
+<datalist id="ctx-presets"><option>2048</option><option>4096</option><option>8192</option><option>16384</option><option>32768</option><option>65536</option><option>131072</option><option>262144</option><option>1048576</option></datalist>
+<datalist id="dl-presets"><option>1000</option><option>10000</option><option>100000</option><option>1000000</option></datalist>
 
 <main>
   <div class="controls">
@@ -68,7 +82,24 @@
         <option value="~creator">Creator A–Z</option>
       </optgroup>
     </select>
+  </div>
+
+  <div class="filters">
+    <label class="filter">
+      <span>Source</span>
+      <select id="lineage">
+        <option value="any">Anything</option>
+        <option value="vanilla">No finetunes or merges</option>
+        <option value="official">Official releases only</option>
+      </select>
+    </label>
+    <label class="filter">
+      <span>Min downloads</span>
+      <input id="min-downloads" type="number" min="0" step="1000" placeholder="any" list="dl-presets">
+    </label>
     <label class="toggle"><input id="fits-only" type="checkbox"> Only what fits on GPU</label>
+    <label class="toggle"><input id="ctx-only" type="checkbox"> Only models trained for <b id="ctx-echo">8K</b> context</label>
+    <p class="filter-count" id="count" hidden></p>
   </div>
 
   <div id="results" aria-live="polite"></div>
