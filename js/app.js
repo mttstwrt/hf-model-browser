@@ -77,6 +77,38 @@ const state = {
   shown: 20,                     // how many survivors to put on the page
   open: null, status: null,
 };
+
+/**
+ * The controls are the single source of truth for the filters, re-read rather
+ * than tracked. Browsers restore form values on reload and on session restore
+ * without firing change or input, so state seeded from defaults and updated
+ * only by events will silently disagree with what the page is showing — a
+ * dropdown reading "Official releases only" over a list that was never filtered.
+ */
+function readFilters() {
+  state.lineage = $('#lineage').value;
+  state.minDownloads = Math.max(0, parseFloat($('#min-downloads').value) || 0);
+  state.ctxOnly = $('#ctx-only').checked;
+  state.fitsOnly = $('#fits-only').checked;
+  state.sort = $('#sort').value;
+  localStorage.setItem('filters', JSON.stringify({
+    lineage: state.lineage, minDownloads: state.minDownloads,
+    ctxOnly: state.ctxOnly, fitsOnly: state.fitsOnly, sort: state.sort,
+  }));
+}
+
+/** Put the saved filters back on the controls, then adopt whatever they hold. */
+function showFilters() {
+  const saved = JSON.parse(localStorage.getItem('filters') || 'null');
+  if (saved) {
+    $('#lineage').value = saved.lineage ?? 'any';
+    $('#min-downloads').value = saved.minDownloads || '';
+    $('#ctx-only').checked = !!saved.ctxOnly;
+    $('#fits-only').checked = !!saved.fitsOnly;
+    if (saved.sort) $('#sort').value = saved.sort;
+  }
+  readFilters();
+}
 const repos = new Map();         // model id -> live record from loadRepo
 let focusAfterRender = null;
 
@@ -140,7 +172,11 @@ async function fetchPage(mine) {
   try {
     const got = await search({ q: state.q, sort: serverSort(state.sort), limit: want, skip: state.models.length });
     if (mine !== requestId) return false;
-    state.models = state.models.concat(got);
+    // Paging by offset over an index that is itself changing can hand back a
+    // repo already held, and a second page landing while this one was in flight
+    // would too. Dropping repeats keeps one card per repo.
+    const seen = new Set(state.models.map((m) => m.id));
+    state.models = state.models.concat(got.filter((m) => !seen.has(m.id)));
     state.exhausted = got.length < want;
     state.status = state.models.length ? null : 'No GGUF models match that search.';
     return true;
@@ -163,11 +199,21 @@ const REACHED_CEILING = () => !state.exhausted && state.models.length >= state.c
  * page with two survivors out of a hundred. Keep pulling until the page is full,
  * the results run out, or the ceiling is hit.
  */
+let filling = false;
 async function fill(mine) {
-  while (mine === requestId && !state.exhausted && state.models.length < state.ceiling) {
-    if (state.models.filter(passesFilters).length >= state.shown) return;
-    render();                                   // show what is in hand meanwhile
-    if (!await fetchPage(mine)) return;
+  // One loop at a time. Changing two filters in quick succession would otherwise
+  // start a second walk that requests the same offset as the first. A loop
+  // already running re-reads the filters on every pass, so it covers the change.
+  if (filling) return;
+  filling = true;
+  try {
+    while (mine === requestId && !state.exhausted && state.models.length < state.ceiling) {
+      if (state.models.filter(passesFilters).length >= state.shown) return;
+      render();                                 // show what is in hand meanwhile
+      if (!await fetchPage(mine)) return;
+    }
+  } finally {
+    filling = false;
   }
 }
 
@@ -406,19 +452,21 @@ $('#q').addEventListener('input', (e) => {
   clearTimeout(typing);
   typing = setTimeout(runSearch, 320);
 });
-$('#sort').addEventListener('change', (e) => {
+// Every filter control routes through readFilters, so state cannot drift from
+// what the page is showing.
+$('#sort').addEventListener('change', () => {
   const before = serverSort(state.sort);
-  state.sort = e.target.value;
+  readFilters();
   serverSort(state.sort) === before ? render() : runSearch();
 });
-$('#fits-only').addEventListener('change', (e) => { state.fitsOnly = e.target.checked; render(); });
-$('#ctx-only').addEventListener('change', (e) => { state.ctxOnly = e.target.checked; refilter(); });
-$('#lineage').addEventListener('change', (e) => { state.lineage = e.target.value; refilter(); });
+$('#fits-only').addEventListener('change', () => { readFilters(); render(); });
+$('#ctx-only').addEventListener('change', () => { readFilters(); refilter(); });
+$('#lineage').addEventListener('change', () => { readFilters(); refilter(); });
 // Its own timer, not the search box's: typing in one must not cancel the other's
 // pending work.
 let dlTyping;
-$('#min-downloads').addEventListener('input', (e) => {
-  state.minDownloads = Math.max(0, parseFloat(e.target.value) || 0);
+$('#min-downloads').addEventListener('input', () => {
+  readFilters();
   clearTimeout(dlTyping);
   dlTyping = setTimeout(refilter, 320);
 });
@@ -452,4 +500,5 @@ $('#results').addEventListener('click', (e) => {
 });
 
 showHardware();
+showFilters();
 runSearch();

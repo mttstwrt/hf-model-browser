@@ -36,6 +36,13 @@ These are applied in the browser, not by the API, so a strict filter has to read
 deeper into the results. The page pulls more as needed, stops after about 400
 models, and says so rather than walking the index.
 
+Filter settings persist alongside the hardware ones, and the controls are the
+single source of truth — they are re-read rather than tracked in a parallel
+variable. Browsers restore form values on reload and on session restore without
+firing `change`, so state seeded from defaults and updated only by events will
+quietly disagree with what the page shows: a dropdown reading "Official releases
+only" above a list that was never filtered.
+
 ## Unified memory
 
 Tick **Unified memory** for Apple Silicon, Ryzen AI Max, Jetson and anything
@@ -59,6 +66,20 @@ page uses ES modules, so `file://` will not work:
 ```
 python3 -m http.server 8000
 ```
+
+That server sends no cache headers, so Chrome will happily keep serving an ES
+module it already has and your edits will appear to do nothing. Reload with
+cache bypassed (`Ctrl`/`Cmd`+`Shift`+`R`) after changing a file under `js/`, or
+serve with caching off:
+
+```
+python3 -c "import http.server as h; \
+  H=type('H',(h.SimpleHTTPRequestHandler,),{'end_headers':lambda s:(s.send_header('Cache-Control','no-store'),h.SimpleHTTPRequestHandler.end_headers(s))}); \
+  h.test(HandlerClass=H, port=8000)"
+```
+
+GitHub Pages sends ETags and revalidates, so this only bites in local
+development.
 
 To publish, push the repository and turn on GitHub Pages for the branch root.
 
